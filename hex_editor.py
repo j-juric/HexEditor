@@ -9,8 +9,8 @@
 
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import QFileDialog
-from PyQt5.QtGui import QTextCursor, QTextCharFormat
+from PyQt5.QtWidgets import QFileDialog, QTextEdit
+from PyQt5.QtGui import QTextCursor, QTextCharFormat, QMouseEvent
 from highlighter import Highlighter
 
 from PyQt5.QtCore import *
@@ -35,8 +35,10 @@ class Ui_MainWindow(object):
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(1050, 600)
         self.mainWindow = MainWindow
+        self.mainWindow.keyPressEvent = self.hexKeyPressEvent
 
         self.initMode=True
+        self.focus=''
 
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -69,12 +71,12 @@ class Ui_MainWindow(object):
         font = QtGui.QFont('Terminal',10,weight=50)
 
         # TEXT OFFSET CONFIG
-        
         self.textOffset.setSizePolicy(sizePolicy)
         self.textOffset.setObjectName("textOffset")
         self.gridLayout_2.addWidget(self.textOffset, 0, 1, 1, 1)
         self.textOffset.setFont(font)
-        self.textOffset.setReadOnly(True)
+        self.textOffset.setReadOnly(False)
+        self.textOffset.focusInEvent = self.offsetFocusInEvent
         #self.offsetHighlighter = Highlighter(self.textOffset.document())
 
         # TEXT ASCII OFFSET CONFIG
@@ -82,7 +84,7 @@ class Ui_MainWindow(object):
         self.textAsciiOffset.setSizePolicy(sizePolicy)
         self.textAsciiOffset.setObjectName('textAsciiOffset')
         self.gridLayout_2.addWidget(self.textAsciiOffset, 0, 2, 1, 1)
-        self.textAsciiOffset.setReadOnly(True)
+        self.textAsciiOffset.setReadOnly(False)
         self.textAsciiOffset.setFont(font)
 
         # TEXT ASCII VALUE CONFIG
@@ -91,9 +93,11 @@ class Ui_MainWindow(object):
         self.gridLayout_2.addWidget(self.textAsciValue, 1, 2, 1, 1)
         #self.asciiHighlighter = Highlighter(self.textAsciValue.document())
         self.textAsciValue.setFont(font)
-        self.textAsciValue.setReadOnly(True)
+        self.textAsciValue.mousePressEvent = self.asciiClickInEvent
+        self.textAsciValue.keyPressEvent = self.asciiKeyPressEvent
+        self.textAsciValue.setReadOnly(False)
         self.textAsciValue.verticalScrollBar().setStyleSheet(style_sheets.verticalScrollBarStyle)
-
+        self.textAsciValue.setOverwriteMode(True)
 
         # TEXT SEGMENT CONFIG
         self.textSegment = QtWidgets.QTextEdit(self.centralwidget)
@@ -105,16 +109,26 @@ class Ui_MainWindow(object):
         self.textSegment.verticalScrollBar().setStyleSheet('QScrollBar {width:0px;}')
 
 
+        # Make characters in hex value uppercase
+        charFormat = QTextCharFormat()
+        charFormat.setFontCapitalization(QFont.Capitalization.AllUppercase)
+
         # TEXT HEX VALUE CONFIG
         self.textHexValue = QtWidgets.QTextEdit(self.centralwidget)
         self.textHexValue.setObjectName("textHexValue")
         self.gridLayout_2.addWidget(self.textHexValue, 1, 1, 1, 1)
         #self.hexValueHighlighter = Highlighter(self.textHexValue.document())
         self.textHexValue.setFont(font)
+        self.textHexValue.setMouseTracking(True)
         self.textHexValue.verticalScrollBar().setStyleSheet('QScrollBar {width:0px;}') 
-        self.textHexValue.selectionChanged.connect(self.hexValueSelectedBehavior)
-        self.textHexValue.cursorPositionChanged.connect(self.hexValueCursorBehavior)
-        self.textHexValue.setReadOnly(True)
+        #self.textHexValue.selectionChanged.connect(self.hexValueSelectedBehavior)
+        #self.textHexValue.cursorPositionChanged.connect(self.hexValueCursorBehavior)
+        self.textHexValue.keyPressEvent = self.hexKeyPressEvent
+        self.textHexValue.mousePressEvent = self.hexClickInEvent
+        #self.textHexValue.focusInEvent = self.hexFocusInEvent
+        self.textHexValue.setReadOnly(False)
+        self.textHexValue.setOverwriteMode(True)
+        self.textHexValue.setCurrentCharFormat(charFormat)
 
         self.gridLayout_2.setColumnMinimumWidth(0, 1)
         self.gridLayout_2.setColumnMinimumWidth(1, 3)
@@ -179,6 +193,8 @@ class Ui_MainWindow(object):
         options |= QFileDialog.DontUseNativeDialog
         file_path, _ = QFileDialog.getOpenFileName(self.centralwidget,'Open file','','','All files (*);',options=options)
         data = None
+        if file_path=='':
+            return
         with open(file_path, 'rb') as file:
             data = file.read()
 
@@ -197,13 +213,116 @@ class Ui_MainWindow(object):
             print('File saving canceled')
         #print(hex_values)
 
+
+####################################################
+#################FOCUS IN EVENTS####################
+####################################################
+
+    def offsetFocusInEvent(self,event):
+        print('Offset focus in')
+        pass
+
+
+    def hexClickInEvent(self,event):
+        #QTextEdit.focusInEvent(self.textHexValue,event)
+        mouse_position = QMouseEvent.pos(QMouseEvent(event))
+        cursor = self.textHexValue.cursorForPosition(mouse_position)
+        cursor.movePosition(QTextCursor.MoveOperation.StartOfWord, QTextCursor.MoveMode.MoveAnchor)
+        self.textHexValue.setTextCursor(cursor)
+        self.textHexValue.setCursorWidth(10)
+        self.textHexValue.ensureCursorVisible()
+        cursor_position = cursor.position()
+        self.trigger_all_selections(cursor_position,'')
+    
+    def asciiClickInEvent(self,event):
+        QTextEdit.mousePressEvent(self.textAsciValue,event)
+        # mouse_position = QMouseEvent.pos(QMouseEvent(event))
+        # cursor = self.textHexValue.cursorForPosition(mouse_position)
+        # self.textAsciValue.setTextCursor(cursor)
+        self.textAsciValue.setCursorWidth(10)
+        self.textAsciValue.ensureCursorVisible()
+        cursor = self.textAsciValue.textCursor()
+        cursor_position = cursor.position()
+        self.detrigger_selections()
+    
+
+        
+
+
     def closeApp(self,s):
         self.mainWindow.close()
         
 
-    def keyPressEvent(self, e):
-        if e.key() == Qt.Key_Escape:
-            self.close()
+    def hexKeyPressEvent(self, e):
+        text = e.text()
+        cursor = self.textHexValue.textCursor()
+        changed_byte = ''
+        # Handle pressed key
+        if (e.key()>47 and e.key()<58) or (e.key()>64 and e.key()<71) or (e.key()>96 and e.key()<103):
+            QTextEdit.keyPressEvent(self.textHexValue,e)
+
+            is_end_of_byte = utils.is_end_of_byte(cursor.position())
+            is_end_of_line = utils.is_end_of_line(cursor.position())
+            position = cursor.position()
+            byte_position = utils.get_byte_position(position)
+            hex_text = self.textHexValue.toPlainText()
+            changed_byte = hex_text[byte_position:byte_position+2]
+            print('Hex text:',changed_byte)
+            if is_end_of_line:
+                cursor.movePosition(QTextCursor.MoveOperation.NextRow,QTextCursor.MoveMode.MoveAnchor)
+                cursor.movePosition(QTextCursor.MoveOperation.Right,QTextCursor.MoveMode.MoveAnchor)
+                cursor.movePosition(QTextCursor.MoveOperation.NextWord,QTextCursor.MoveMode.MoveAnchor)
+            if is_end_of_byte:
+                cursor.movePosition(QTextCursor.MoveOperation.NextWord,QTextCursor.MoveMode.MoveAnchor)   
+        elif e.key() == Qt.Key.Key_Down:
+            cursor.movePosition(QTextCursor.MoveOperation.Down,QTextCursor.MoveMode.MoveAnchor)
+        elif e.key() == Qt.Key.Key_Up:
+            cursor.movePosition(QTextCursor.MoveOperation.Up,QTextCursor.MoveMode.MoveAnchor)
+        elif e.key() == Qt.Key.Key_Left:
+            cursor.movePosition(QTextCursor.MoveOperation.PreviousWord,QTextCursor.MoveMode.MoveAnchor)
+        elif e.key() == Qt.Key.Key_Right:
+            cursor.movePosition(QTextCursor.MoveOperation.NextWord,QTextCursor.MoveMode.MoveAnchor)
+
+        cursor_position = cursor.position()
+        self.trigger_all_selections(cursor_position,changed_byte)
+        self.textHexValue.setTextCursor(cursor)
+
+    def asciiKeyPressEvent(self, e):
+        cursor = self.textAsciValue.textCursor()
+        position = cursor.position()
+        changed_byte = ''
+        # Handle pressed key
+        if e.key()>32 and e.key()<127:
+            print('Key value:',e.text())
+            QTextEdit.keyPressEvent(self.textAsciValue,e)
+            self.hexByteChanged(e.text(), position)
+            #cursor.movePosition(QTextCursor.MoveOperation.Right,QTextCursor.MoveMode.MoveAnchor)
+        elif e.key() == Qt.Key.Key_Down:
+            cursor.movePosition(QTextCursor.MoveOperation.Down,QTextCursor.MoveMode.MoveAnchor)
+        elif e.key() == Qt.Key.Key_Up:
+            cursor.movePosition(QTextCursor.MoveOperation.Up,QTextCursor.MoveMode.MoveAnchor)
+        elif e.key() == Qt.Key.Key_Left:
+            cursor.movePosition(QTextCursor.MoveOperation.Left,QTextCursor.MoveMode.MoveAnchor)
+        elif e.key() == Qt.Key.Key_Right:
+            cursor.movePosition(QTextCursor.MoveOperation.Right,QTextCursor.MoveMode.MoveAnchor)
+
+        cursor_position = cursor.position()
+        self.textAsciValue.setTextCursor(cursor)
+
+    def hexByteChanged(self, value, ascii_position):
+        #print('ASCII position', ascii_position)
+        print(type(value))
+        row = ascii_position//17
+        column = ascii_position%17
+        hex_position = utils.get_hex_position(row,column)
+        cursor = self.textHexValue.textCursor()
+        cursor.setPosition(hex_position,QTextCursor.MoveMode.MoveAnchor)
+        cursor.movePosition(QTextCursor.MoveOperation.EndOfWord,QTextCursor.MoveMode.KeepAnchor)
+        hex_num = hex(ord(value))[2:]
+        print('Hex num:',hex_num)
+        hex_num = hex_num.zfill(2)
+        cursor.insertText(hex_num)
+            
 
     def hexValueSelectedBehavior(self):
         print('Selection Behaviour')
@@ -213,49 +332,8 @@ class Ui_MainWindow(object):
         # asciiCursor = self.textAsciValue.textCursor()
         print('Cursor Behaviour')
         hexCursor = self.textHexValue.textCursor()
-        hexCursor.movePosition(hexCursor.StartOfWord, hexCursor.MoveAnchor)
-        hexCursor.movePosition(hexCursor.EndOfWord, hexCursor.KeepAnchor)
-
-        if len(hexCursor.selectedText()) > 2:
-            pos = hexCursor.position()
-            hexCursor.setPosition(pos-2,QTextCursor.MoveMode.MoveAnchor)
-            hexCursor.movePosition(QTextCursor.MoveOperation.StartOfWord, QTextCursor.MoveMode.MoveAnchor)
-            hexCursor.movePosition(QTextCursor.MoveOperation.EndOfWord, QTextCursor.MoveMode.KeepAnchor)
-
-
-        self.textHexValue.setTextCursor(hexCursor)
-        #selectedHexValueText = hexCursor.selectedText()
-
-        if hexCursor.hasSelection() == True:
-            selection_start_pos = hexCursor.selectionStart()
-            selection_end_pos = hexCursor.selectionEnd()
-            selection_row = selection_start_pos//81
-            selection_column = utils.get_selection_column(selection_start_pos%81)
-
-            self.triggerSegmentSelection(selection_row)
-            self.triggerOffsetSelection(selection_start_pos%81, selection_end_pos%81)
-            self.triggerAsciiSelection(selection_row,selection_column)
-            self.triggerAsciiOffsetSelection(selection_column)
-            # print('Start:',selection_start_pos%41)
-            # print('End:',selection_end_pos)
-            # print('*'*10)
-        else:
-            cursor = self.textAsciiOffset.textCursor()
-            cursor.clearSelection()
-            self.textAsciiOffset.setTextCursor(cursor)
-
-            cursor = self.textAsciValue.textCursor()
-            cursor.clearSelection()
-            self.textAsciValue.setTextCursor(cursor)
-            
-            cursor = self.textSegment.textCursor()
-            cursor.clearSelection()
-            self.textSegment.setTextCursor(cursor)
-
-            cursor = self.textOffset.textCursor()
-            cursor.clearSelection()
-            self.textOffset.setTextCursor(cursor)
-        # print('Slected value:',selectedHexValueText)
+        position = hexCursor.position()
+        
 
     def triggerSegmentSelection(self, row):
         # print('Segment Selection')
@@ -280,13 +358,49 @@ class Ui_MainWindow(object):
         cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor)
         self.textAsciiOffset.setTextCursor(cursor)
 
-    def triggerAsciiSelection(self,row,column):
+    def triggerAsciiSelection(self,row,column,changed_byte:str):
         cursor = self.textAsciValue.textCursor()
+        if changed_byte != '':
+            ascii_character = bytearray.fromhex(changed_byte).decode()#changed_byte.decode('hex')
+            print('decoded:',ascii_character)
+            cursor.insertText(ascii_character)
         cursor.clearSelection()
         cursor.setPosition(row*17 + column, QTextCursor.MoveMode.MoveAnchor)
         cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor)
         self.textAsciValue.setTextCursor(cursor)
+
+
         
+    def trigger_all_selections(self,cursor_position,changed_byte):
+        cursor_row = cursor_position//81
+        cursor_column = utils.get_selection_column(cursor_position%81)
+
+        self.triggerAsciiOffsetSelection(cursor_column)
+        self.triggerAsciiSelection(cursor_row, cursor_column,changed_byte)
+        #self.triggerOffsetSelection(cursor_position%81)
+        self.triggerSegmentSelection(cursor_row)
+
+    def detrigger_selections(self):
+        cursor = self.textAsciiOffset.textCursor()
+        cursor.clearSelection()
+        self.textAsciiOffset.setTextCursor(cursor)
+
+        cursor = self.textAsciValue.textCursor()
+        cursor.clearSelection()
+        self.textAsciValue.setTextCursor(cursor)
+        
+        cursor = self.textSegment.textCursor()
+        cursor.clearSelection()
+        self.textSegment.setTextCursor(cursor)
+
+        cursor = self.textOffset.textCursor()
+        cursor.clearSelection()
+        self.textOffset.setTextCursor(cursor)
+
+####################################################
+#################RETRANSLATE UI#####################
+####################################################
+
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
@@ -299,6 +413,12 @@ class Ui_MainWindow(object):
         self.actionSave.setText(_translate("MainWindow", "Save"))
         self.actionOpen.setText(_translate("MainWindow", "Open"))
         self.actionExit.setText(_translate("MainWindow", "Exit"))
+
+
+
+####################################################
+#############LOAD FILE AND PRINT CONTENT############
+####################################################
 
     def loadFile(self, data):
         #numbers = generate_random_hex(1647)
@@ -409,6 +529,11 @@ class Ui_MainWindow(object):
         ascii_str='\n'.join([ascii_str,row_str])
         ascii_str=ascii_str[1:]
         self.textAsciValue.setText(ascii_str.encode('ascii',errors='replace').decode('ascii',errors='replace'))
+
+
+####################################################
+###############UI LOGIC CONFIGURATION###############
+####################################################
 
     def syncScrollBars(self):
         segmentScrollBar = self.textSegment.verticalScrollBar()
