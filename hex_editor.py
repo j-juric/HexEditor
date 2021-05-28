@@ -9,7 +9,7 @@
 
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import QFileDialog, QTextEdit
+from PyQt5.QtWidgets import QFileDialog, QShortcut, QTextEdit
 from PyQt5.QtGui import QTextCursor, QTextCharFormat, QMouseEvent
 from highlighter import Highlighter
 
@@ -113,6 +113,7 @@ class Ui_MainWindow(object):
         charFormat = QTextCharFormat()
         charFormat.setFontCapitalization(QFont.Capitalization.AllUppercase)
 
+        
         # TEXT HEX VALUE CONFIG
         self.textHexValue = QtWidgets.QTextEdit(self.centralwidget)
         self.textHexValue.setObjectName("textHexValue")
@@ -123,7 +124,9 @@ class Ui_MainWindow(object):
         self.textHexValue.verticalScrollBar().setStyleSheet('QScrollBar {width:0px;}') 
         #self.textHexValue.selectionChanged.connect(self.hexValueSelectedBehavior)
         #self.textHexValue.cursorPositionChanged.connect(self.hexValueCursorBehavior)
+        self.defaultHexKeyPressEvent = self.textHexValue.keyPressEvent
         self.textHexValue.keyPressEvent = self.hexKeyPressEvent
+        self.defaultHexMouseEvent = self.textHexValue.mousePressEvent
         self.textHexValue.mousePressEvent = self.hexClickInEvent
         #self.textHexValue.focusInEvent = self.hexFocusInEvent
         self.textHexValue.setReadOnly(False)
@@ -167,18 +170,34 @@ class Ui_MainWindow(object):
         self.actionOpen.setObjectName("actionOpen")
         self.actionExit = QtWidgets.QAction(MainWindow)
         self.actionExit.setObjectName("actionExit")
+        self.actionReadMode = QtWidgets.QAction(MainWindow)
+        self.actionReadMode.setObjectName("actionReadMode")
+        self.actionEditMode = QtWidgets.QAction(MainWindow)
+        self.actionEditMode.setObjectName("actionEditMode")
         self.menuFile.addAction(self.actionSave)
         self.menuFile.addAction(self.actionOpen)
         self.menuFile.addAction(self.actionExit)
+        self.menuEdit.addAction(self.actionReadMode)
+        self.menuEdit.addAction(self.actionEditMode)
         self.menubar.addAction(self.menuFile.menuAction())
         self.menubar.addAction(self.menuEdit.menuAction())
         self.menubar.addAction(self.menuView.menuAction())
         # self.menubar.addAction(self.menuHelp.menuAction())
         self.menubar.addAction(self.menuAbout.menuAction())
 
-        self.actionOpen.triggered.connect(self.openFileClick)
-        self.actionSave.triggered.connect(self.saveFileClick)
+        self.toggle_edit_sc = QShortcut(QKeySequence('Ctrl+E'), MainWindow)
+        self.toggle_edit_sc.activated.connect(self.enter_edit_mode)
+
+        self.toggle_read_sc = QShortcut(QKeySequence('Ctrl+R'), MainWindow)
+
+        self.toggle_read_sc.activated.connect(self.enter_read_mode)
+
+        self.actionOpen.triggered.connect(self.open_file_click)
+        self.actionSave.triggered.connect(self.save_file_click)
         self.actionExit.triggered.connect(self.closeApp)
+
+        self.actionReadMode.triggered.connect(self.toggle_read_mode)
+        self.actionEditMode.triggered.connect(self.toggle_edit_mode)
 
         self.retranslateUi(MainWindow)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
@@ -188,7 +207,7 @@ class Ui_MainWindow(object):
         self.printAsciiOffset()
         self.syncScrollBars()
 
-    def openFileClick(self,s):
+    def open_file_click(self,s):
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
         file_path, _ = QFileDialog.getOpenFileName(self.centralwidget,'Open file','','','All files (*);',options=options)
@@ -200,7 +219,7 @@ class Ui_MainWindow(object):
 
         self.loadFile(data)
 
-    def saveFileClick(self,s):
+    def save_file_click(self,s):
         hex_string = self.textHexValue.toPlainText()
         hex_bytes = utils.string_to_hex(hex_string)
         options = QtWidgets.QFileDialog.Options()
@@ -213,6 +232,22 @@ class Ui_MainWindow(object):
             print('File saving canceled')
         #print(hex_values)
 
+    def toggle_read_mode(self,s):
+        self.enter_read_mode()
+
+    def toggle_edit_mode(self,s):
+        self.enter_edit_mode()
+
+    def enter_read_mode(self):
+        self.textHexValue.setReadOnly(True)
+        self.textHexValue.mousePressEvent = self.defaultHexMouseEvent
+        self.textHexValue.keyPressEvent = None
+
+    def enter_edit_mode(self):
+        self.textHexValue.setReadOnly(False)
+        self.textHexValue.mousePressEvent = self.hexClickInEvent
+        self.textHexValue.keyPressEvent = self.hexKeyPressEvent
+        
 
 ####################################################
 #################FOCUS IN EVENTS####################
@@ -413,6 +448,8 @@ class Ui_MainWindow(object):
         self.actionSave.setText(_translate("MainWindow", "Save"))
         self.actionOpen.setText(_translate("MainWindow", "Open"))
         self.actionExit.setText(_translate("MainWindow", "Exit"))
+        self.actionReadMode.setText(_translate("MainWindow","Toggle Read Mode"))
+        self.actionEditMode.setText(_translate("MainWindow","Toggle Edit Mode"))
 
 
 
